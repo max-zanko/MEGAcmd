@@ -249,8 +249,8 @@ fs::path MegaCmdLogger::getDefaultFilePath()
 {
     auto dirs = PlatformDirectories::getPlatformSpecificDirectories();
 
-    assert(!dirs->configDirPath().empty());
-    return dirs->configDirPath() / "megacmdserver.log";
+    assert(!dirs->stateDirPath().empty());
+    return dirs->stateDirPath() / "megacmdserver.log";
 }
 
 bool MegaCmdLogger::isMegaCmdSource(const std::string &source)

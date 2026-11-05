@@ -36,6 +36,7 @@ TEST(PlatformDirectoriesTest, runtimeDirPath)
 #endif
 
 #ifndef _WIN32
+    auto configXdgHomeGuard = TestInstrumentsUnsetEnvVarGuard("XDG_CONFIG_HOME");
     G_SUBTEST << "Non existing HOME folder";
     {
         auto homeGuard = TestInstrumentsEnvVarGuard("HOME", "/non-existent-dir");
@@ -68,8 +69,9 @@ TEST(PlatformDirectoriesTest, runtimeDirPath)
     #else
     G_SUBTEST << "Existing HOME folder";
     {
-        auto homeGuard = TestInstrumentsEnvVarGuard("HOME", "/tmp");
-        EXPECT_EQ(dirs->runtimeDirPath(), "/tmp/.megaCmd");
+        SelfDeletingTmpFolder tmpFolder;
+        auto homeGuard = TestInstrumentsEnvVarGuard("HOME", tmpFolder.string());
+        EXPECT_EQ(dirs->runtimeDirPath(), tmpFolder.path() / ".config" / "megacmd");
 
         ASSERT_TRUE(ConfigurationManager::lockExecution());
         ASSERT_TRUE(ConfigurationManager::unlockExecution());
@@ -84,7 +86,7 @@ TEST(PlatformDirectoriesTest, runtimeDirPath)
         fs::path runtimeFolder = tmpFolder.path() / "Library" / "Caches" / "megacmd.mac";
         fs::create_directories(runtimeFolder);
     #else
-        fs::path runtimeFolder = tmpFolder.path() / ".megaCmd";
+        fs::path runtimeFolder = tmpFolder.path() / ".config" / "megacmd";
     #endif
 
         auto homeGuard = TestInstrumentsEnvVarGuard("HOME", tmpFolder.string());
@@ -126,6 +128,11 @@ TEST(PlatformDirectoriesTest, configDirPath)
 
     auto dirs = PlatformDirectories::getPlatformSpecificDirectories();
     ASSERT_TRUE(dirs != nullptr);
+
+#ifndef _WIN32
+    auto configXdgHomeGuard = TestInstrumentsUnsetEnvVarGuard("XDG_CONFIG_HOME");
+    auto stateXdgHomeGuard = TestInstrumentsUnsetEnvVarGuard("XDG_STATE_HOME");
+#endif
 
 #ifdef _WIN32
     G_SUBTEST << "With $MEGACMD_WORKING_FOLDER_SUFFIX";
@@ -176,23 +183,24 @@ TEST(PlatformDirectoriesTest, configDirPath)
 #else
     G_SUBTEST << "With alternative existing HOME";
     {
-        auto homeGuard = TestInstrumentsEnvVarGuard("HOME", "/tmp");
-        EXPECT_EQ(dirs->configDirPath().string(), "/tmp/.megaCmd");
+        SelfDeletingTmpFolder tmpFolder;
+        auto homeGuard = TestInstrumentsEnvVarGuard("HOME", tmpFolder.string());
+        EXPECT_EQ(dirs->configDirPath(), tmpFolder.path() / ".config" / "megacmd");
 
         ConfigurationManager::saveSession("test_session_data");
-        EXPECT_TRUE(fs::is_regular_file(dirs->configDirPath() / "session"));
+        EXPECT_TRUE(fs::is_regular_file(dirs->stateDirPath() / "session"));
     }
 
     G_SUBTEST << "With alternative existing non-ascii HOME";
     {
         SelfDeletingTmpFolder tmpFolder("file_\u5f20\u4e09");
-        fs::path configFolder = tmpFolder.path() / ".megaCmd";
+        fs::path configFolder = tmpFolder.path() / ".config" / "megacmd";
 
         auto homeGuard = TestInstrumentsEnvVarGuard("HOME", tmpFolder.string());
         EXPECT_EQ(dirs->configDirPath().string(), configFolder.string());
 
         ConfigurationManager::saveSession("test_session_data");
-        EXPECT_TRUE(fs::is_regular_file(dirs->configDirPath() / "session"));
+        EXPECT_TRUE(fs::is_regular_file(dirs->stateDirPath() / "session"));
     }
 
     G_SUBTEST << "With alternative NON existing HOME";
@@ -201,7 +209,7 @@ TEST(PlatformDirectoriesTest, configDirPath)
         EXPECT_EQ(dirs->configDirPath().string(), megacmd::PosixDirectories::noHomeFallbackFolder());
 
         ConfigurationManager::saveSession("test_session_data");
-        EXPECT_TRUE(fs::is_regular_file(dirs->configDirPath() / "session"));
+        EXPECT_TRUE(fs::is_regular_file(dirs->stateDirPath() / "session"));
     }
 
     G_SUBTEST << "HOME exists but is not a directory";
@@ -227,7 +235,7 @@ TEST(PlatformDirectoriesTest, configDirPath)
     {
         SelfDeletingTmpFolder tmpFolder;
         auto homeGuard = TestInstrumentsEnvVarGuard("HOME", tmpFolder.string());
-        const fs::path sessionFile = dirs->configDirPath() / "session";
+        const fs::path sessionFile = dirs->stateDirPath() / "session";
 
         auto sessionFilePerms = [&sessionFile]
         {
@@ -274,11 +282,11 @@ TEST(PlatformDirectoriesTest, configDirPath)
     {
         SelfDeletingTmpFolder tmpFolder(std::string(250, 'a'));
         auto homeGuard = TestInstrumentsEnvVarGuard("HOME", tmpFolder.string());
-        fs::path configPath = dirs->configDirPath();
-        EXPECT_FALSE(configPath.empty());
+        fs::path statePath = dirs->stateDirPath();
+        EXPECT_FALSE(statePath.empty());
 
         ConfigurationManager::saveSession("test_session_data");
-        EXPECT_TRUE(fs::is_regular_file(configPath / "session"));
+        EXPECT_TRUE(fs::is_regular_file(statePath / "session"));
     }
 
     G_SUBTEST << "Path with special characters";
@@ -289,22 +297,22 @@ TEST(PlatformDirectoriesTest, configDirPath)
         SelfDeletingTmpFolder tmpFolder("test@#$%^&*()_+-=[]{}|;':\",.<>?");
 #endif
         auto homeGuard = TestInstrumentsEnvVarGuard("HOME", tmpFolder.string());
-        fs::path configPath = dirs->configDirPath();
-        EXPECT_FALSE(configPath.empty());
+        fs::path statePath = dirs->stateDirPath();
+        EXPECT_FALSE(statePath.empty());
 
         ConfigurationManager::saveSession("test_session_data");
-        EXPECT_TRUE(fs::is_regular_file(configPath / "session"));
+        EXPECT_TRUE(fs::is_regular_file(statePath / "session"));
     }
 
     G_SUBTEST << "Path with spaces";
     {
         SelfDeletingTmpFolder tmpFolder("test folder with spaces");
         auto homeGuard = TestInstrumentsEnvVarGuard("HOME", tmpFolder.string());
-        fs::path configPath = dirs->configDirPath();
-        EXPECT_FALSE(configPath.empty());
+        fs::path statePath = dirs->stateDirPath();
+        EXPECT_FALSE(statePath.empty());
 
         ConfigurationManager::saveSession("test_session_data");
-        EXPECT_TRUE(fs::is_regular_file(configPath / "session"));
+        EXPECT_TRUE(fs::is_regular_file(statePath / "session"));
     }
 
 #ifndef _WIN32
@@ -312,11 +320,11 @@ TEST(PlatformDirectoriesTest, configDirPath)
     {
         SelfDeletingTmpFolder tmpFolder("test\n\tfolder");
         auto homeGuard = TestInstrumentsEnvVarGuard("HOME", tmpFolder.string());
-        fs::path configPath = dirs->configDirPath();
-        EXPECT_FALSE(configPath.empty());
+        fs::path statePath = dirs->stateDirPath();
+        EXPECT_FALSE(statePath.empty());
 
         ConfigurationManager::saveSession("test_session_data");
-        EXPECT_TRUE(fs::is_regular_file(configPath / "session"));
+        EXPECT_TRUE(fs::is_regular_file(statePath / "session"));
     }
 #endif
 #endif

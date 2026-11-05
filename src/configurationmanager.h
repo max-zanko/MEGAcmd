@@ -283,10 +283,11 @@ public:
 
     static fs::path getConfigFolder();
 
-    // creates a subfolder within the state dir and returns it (utf8)
-    static fs::path getConfigFolderSubdir(const fs::path& subdirName);
+    // Creates a subfolder within the state dir and returns it (utf8).
+    static fs::path getStateFolderSubdir(const fs::path& subdirName);
     static fs::path getAndCreateRuntimeDir();
     static fs::path getAndCreateConfigDir();
+    static fs::path getAndCreateStateDir();
 
     static bool getHasBeenUpdated();
 

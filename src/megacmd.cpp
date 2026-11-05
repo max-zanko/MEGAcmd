@@ -5901,10 +5901,10 @@ int executeServer(int argc, char* argv[],
     LOG_debug << "MEGAcmd version: " << MEGACMD_MAJOR_VERSION << "." << MEGACMD_MINOR_VERSION << "." << MEGACMD_MICRO_VERSION << "." << MEGACMD_BUILD_ID << ": code " << MEGACMD_CODE_VERSION;
     LOG_debug << "MEGA SDK version: " << SDK_COMMIT_HASH;
 
-    const fs::path configDirPath = ConfigurationManager::getAndCreateConfigDir();
-    const std::string configDirStrUtf8 = pathAsUtf8(configDirPath);
+    const fs::path stateDirPath = ConfigurationManager::getAndCreateStateDir();
+    const std::string stateDirStrUtf8 = pathAsUtf8(stateDirPath);
 
-    api = new MegaApi("BdARkQSQ", configDirStrUtf8.c_str(), userAgent);
+    api = new MegaApi("BdARkQSQ", stateDirStrUtf8.c_str(), userAgent);
 
     if (!debug_api_url.empty())
     {
@@ -5930,7 +5930,7 @@ int executeServer(int argc, char* argv[],
 
     for (int i = 0; i < numberOfApiFolders; i++)
     {
-        const fs::path apiFolderPath = ConfigurationManager::getConfigFolderSubdir("apiFolder_" + std::to_string(i));
+        const fs::path apiFolderPath = ConfigurationManager::getStateFolderSubdir("apiFolder_" + std::to_string(i));
         const std::string apiFolderStrUtf8 = pathAsUtf8(apiFolderPath);
 
         MegaApi *apiFolder = new MegaApi("BdARkQSQ", apiFolderStrUtf8.c_str(), userAgent);

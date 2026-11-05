@@ -1504,6 +1504,103 @@ std::wstring getNamedPipeName()
     return name;
 }
 #else // !defined(_WIN32)
+namespace
+{
+bool directoryHasEntries(const fs::path& directory)
+{
+    // A missing, empty, or unreadable destination is eligible for the legacy fallback.
+    std::error_code ec;
+    fs::directory_iterator it(directory, ec);
+    return !ec && it != fs::directory_iterator();
+}
+
+bool isDirectory(const fs::path& directory)
+{
+    std::error_code ec;
+    return fs::is_directory(directory, ec) && !ec;
+}
+
+fs::path xdgApplicationDirectory(const std::string& home,
+                                const char* xdgVariable,
+                                const char* defaultBase,
+                                const char* directoryKind)
+{
+    fs::path base;
+    const char* configuredBase = std::getenv(xdgVariable);
+    if (configuredBase && *configuredBase)
+    {
+        fs::path configuredPath(configuredBase);
+        if (configuredPath.is_absolute())
+        {
+            // XDG base-directory variables are meaningful only when they contain absolute paths.
+            base = configuredPath;
+        }
+        else
+        {
+            static std::mutex invalidValueWarningMutex;
+            static std::set<std::string> invalidValues;
+            std::lock_guard<std::mutex> lock(invalidValueWarningMutex);
+            if (invalidValues.insert(std::string(xdgVariable) + "=" + configuredBase).second)
+            {
+                std::cerr << xdgVariable << " must be an absolute path; ignoring its relative value" << std::endl;
+            }
+        }
+    }
+
+    if (base.empty())
+    {
+        // Without a valid XDG override, use the XDG default beneath HOME. A bad or unavailable HOME
+        // cannot provide that default, so retain the private per-user fallback used by older builds.
+        if (home.empty() || !isDirectory(home))
+        {
+            return megacmd::PosixDirectories::getOrCreateFallbackFolder();
+        }
+        base = fs::path(home) / defaultBase;
+    }
+
+    const fs::path xdgDirectory = base / "megacmd";
+    // An absolute XDG base is usable on its own. HOME is needed only for legacy lookup and defaults.
+    if (home.empty() || !isDirectory(home))
+    {
+        return xdgDirectory;
+    }
+
+    const fs::path legacyDirectory = fs::path(home) / ".megaCmd";
+    if (legacyDirectory == xdgDirectory || !directoryHasEntries(legacyDirectory))
+    {
+        return xdgDirectory;
+    }
+
+    static std::mutex warningMutex;
+    static std::set<std::string> warnedDirectories;
+    const bool hasXdgData = directoryHasEntries(xdgDirectory);
+    const std::string warningKey = std::string(xdgVariable) + (hasXdgData ? ":legacy-present" : ":legacy-fallback");
+    {
+        std::lock_guard<std::mutex> lock(warningMutex);
+        if (warnedDirectories.insert(warningKey).second)
+        {
+            if (hasXdgData)
+            {
+                // Prefer populated XDG locations, but leave legacy files untouched for manual migration.
+                std::cerr << "Using " << xdgDirectory << " for MEGAcmd " << directoryKind
+                          << "; legacy data remains at " << legacyDirectory
+                          << " and has not been moved" << std::endl;
+            }
+            else
+            {
+                // Reuse existing state rather than silently starting with an empty XDG directory.
+                std::cerr << "Using existing legacy MEGAcmd directory " << legacyDirectory
+                          << " for " << directoryKind << " because " << xdgDirectory
+                          << " is empty. Existing files are left in place; move them to the XDG directory"
+                             " to switch" << std::endl;
+            }
+        }
+    }
+
+    return hasXdgData ? xdgDirectory : legacyDirectory;
+}
+} // namespace
+
 std::string PosixDirectories::homeDirPath()
 {
     const char *homedir = getenv("HOME");
@@ -1527,16 +1624,12 @@ std::string PosixDirectories::homeDirPath()
 
 fs::path PosixDirectories::configDirPath()
 {
-    std::string home = homeDirPath();
-    if (home.empty())
-    {
-        return getOrCreateFallbackFolder();
-    }
+    return xdgApplicationDirectory(homeDirPath(), "XDG_CONFIG_HOME", ".config", "configuration");
+}
 
-    struct stat path_stat = {};
-    bool exists = !stat(home.c_str(), &path_stat) && S_ISDIR(path_stat.st_mode);
-
-    return exists ? home.append("/.megaCmd") : getOrCreateFallbackFolder();
+fs::path PosixDirectories::stateDirPath()
+{
+    return xdgApplicationDirectory(homeDirPath(), "XDG_STATE_HOME", ".local/state", "state");
 }
 
 string PosixDirectories::noHomeFallbackFolder()

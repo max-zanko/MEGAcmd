@@ -99,7 +99,7 @@ static const char* const persistentmcmdconfigurationkeys[] =
 void ConfigurationManager::createFolderIfNotExisting(const fs::path &folder)
 {
     std::error_code ec;
-    auto createdOk = fs::create_directory(folder, ec);
+    auto createdOk = fs::create_directories(folder, ec);
     bool alreadyExisting = !createdOk && !ec;
     if (alreadyExisting)
     {
@@ -151,6 +151,20 @@ fs::path ConfigurationManager::getAndCreateConfigDir()
     return configDir;
 }
 
+fs::path ConfigurationManager::getAndCreateStateDir()
+{
+    auto dirs = PlatformDirectories::getPlatformSpecificDirectories();
+    const fs::path stateDir = dirs->stateDirPath();
+    if (stateDir.empty())
+    {
+        LOG_fatal << "Could not get state directory path";
+        throw std::runtime_error("Could not get state directory path");
+    }
+
+    createFolderIfNotExisting(stateDir);
+    return stateDir;
+}
+
 fs::path ConfigurationManager::getAndCreateRuntimeDir()
 {
     auto dirs = PlatformDirectories::getPlatformSpecificDirectories();
@@ -165,26 +179,26 @@ fs::path ConfigurationManager::getAndCreateRuntimeDir()
     return runtimeDir;
 }
 
-fs::path ConfigurationManager::getConfigFolderSubdir(const fs::path& subdirName)
+fs::path ConfigurationManager::getStateFolderSubdir(const fs::path& subdirName)
 {
     auto dirs = PlatformDirectories::getPlatformSpecificDirectories();
-    const fs::path configDir = dirs->configDirPath();
-    assert(!configDir.empty());
+    const fs::path stateDir = dirs->stateDirPath();
+    assert(!stateDir.empty());
 
-    fs::path configSubDir = configDir / subdirName;
+    fs::path stateSubDir = stateDir / subdirName;
 
-    createFolderIfNotExisting(configSubDir);
+    createFolderIfNotExisting(stateSubDir);
 
-    return configSubDir;
+    return stateSubDir;
 }
 
 void ConfigurationManager::saveSession(const char*session)
 {
     std::lock_guard<std::recursive_mutex> g(settingsMutex);
-    auto configDir = getAndCreateConfigDir();
-    assert(!configDir.empty());
+    auto stateDir = getAndCreateStateDir();
+    assert(!stateDir.empty());
 
-    const fs::path sessionFilePath = configDir / "session";
+    const fs::path sessionFilePath = stateDir / "session";
     LOG_debug << "Session file: " << sessionFilePath;
 
 #ifndef WIN32
@@ -699,10 +713,10 @@ void ConfigurationManager::loadConfiguration(bool debug)
 #endif
 
     // SESSION
-    const fs::path configDir = getAndCreateConfigDir();
-    if (!configDir.empty())
+    const fs::path stateDir = getAndCreateStateDir();
+    if (!stateDir.empty())
     {
-        const fs::path sessionFilePath = configDir / "session";
+        const fs::path sessionFilePath = stateDir / "session";
         if (debug)
         {
             COUT << "Session file: " << sessionFilePath << std::endl;

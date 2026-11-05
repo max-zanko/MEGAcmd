@@ -55,7 +55,7 @@ This will install `mega-cmd`, `mega-cmd-server`, and all `mega-*` commands such 
 We can specify the default directory to install from by adding the `-DCMAKE_INSTALL_PREFIX` flag while configuring.
 
 # Usage
-Before explaining the two ways of interaction, it's important to understand how MEGAcmd works. When you login with MEGAcmd, your session, the list of synced folders, cache databases, and extra configuration are stored in your local home folder. Closing it does not delete those, and restarting the MEGAcmd server will restore your previous session (similary to the MEGA Desktop App, which won't ask for user/password once restarted).
+Before explaining the two ways of interaction, it's important to understand how MEGAcmd works. On Linux and macOS, MEGAcmd stores configuration under `$XDG_CONFIG_HOME/megacmd` (default: `~/.config/megacmd`) and persistent session and SDK state under `$XDG_STATE_HOME/megacmd` (default: `~/.local/state/megacmd`). If either XDG directory is empty while the legacy `~/.megaCmd` directory contains data, MEGAcmd uses the legacy directory for that category and reports the fallback; it does not move or remove files. Closing the client does not delete the saved state, and restarting the MEGAcmd server restores the previous session (similarly to the MEGA Desktop App, which won't ask for user/password once restarted).
 
 You will need to `logout` properly in order to clean your data.
 

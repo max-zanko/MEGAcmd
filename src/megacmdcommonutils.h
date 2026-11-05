@@ -433,11 +433,16 @@ private:
  * Note: returned values are encoded in utf-8.
  *
  * 	+---------------------------------------------------------------------------------------------------------------------+
- * 	| DirPath | Windows              | Linux          | macOS                            | Linux/macOS (no HOME fallback) |
- * 	|---------|----------------------|----------------|----------------------------------|--------------------------------|
- * 	| runtime | $EXECFOLDER/.megaCmd | $HOME/.megaCmd | $HOME/Library/Caches/megacmd.mac | /tmp/megacmd-UID               |
- * 	| config  | $EXECFOLDER/.megaCmd | $HOME/.megaCmd | $HOME/.megaCmd                   | /tmp/megacmd-UID               |
+ * 	| DirPath | Windows              | Linux/macOS                                                   | macOS-specific runtime                     |
+ * 	|---------|----------------------|---------------------------------------------------------------|--------------------------------------------|
+ * 	| runtime | $EXECFOLDER/.megaCmd | config directory                                              | $HOME/Library/Caches/megacmd.mac          |
+ * 	| config  | $EXECFOLDER/.megaCmd | $XDG_CONFIG_HOME/megacmd or $HOME/.config/megacmd             | same                                      |
+ * 	| state   | $EXECFOLDER/.megaCmd | $XDG_STATE_HOME/megacmd or $HOME/.local/state/megacmd         | same                                      |
  * 	+---------------------------------------------------------------------------------------------------------------------+
+ *
+ * If an XDG directory is empty and $HOME/.megaCmd contains existing data, MEGAcmd uses the legacy
+ * directory for that category and reports the fallback. When HOME and the corresponding XDG
+ * variable are unavailable, Linux/macOS use the private /tmp/megacmd-UID fallback instead.
  *
  * Any user can create /tmp/megacmd-UID first, so an existing one is only used if it is a folder
  * owned by the current user, with no permissions for group or others (see createOrCheckPrivateFolder).
@@ -460,12 +465,22 @@ public:
         return configDirPath();
     }
     /**
-     * @brief configDirPath returns the base path for storing configuration and data files.
+     * @brief configDirPath returns the base path for storing configuration files.
      *
-     * Meant for user-editable configuration files, data files that should not be deleted
-     * (session credentials, SDK workding directory, logs, etc).
+     * Meant for user-editable configuration files and sync/backup configuration.
      */
     virtual fs::path configDirPath() = 0;
+
+    /**
+     * @brief stateDirPath returns the base path for persistent application state and SDK data.
+     *
+     * Meant for session credentials, SDK working data, logs, and other persistent state.
+     * Defaults to configDirPath() on platforms that do not separate the two.
+     */
+    virtual fs::path stateDirPath()
+    {
+        return configDirPath();
+    }
 };
 
 #ifdef _WIN32
@@ -480,6 +495,7 @@ class PosixDirectories : public PlatformDirectories
 public:
     std::string homeDirPath();
     virtual fs::path configDirPath() override;
+    virtual fs::path stateDirPath() override;
 
     static std::string noHomeFallbackFolder();
 

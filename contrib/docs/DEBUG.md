@@ -20,7 +20,7 @@ The source file and line the message was logged from is appended at the end of t
 
 Logs coming from MEGAcmd are written to the `megacmdserver.log` file. This file is not removed across restarts, so when it gets too large it is automatically compressed and renamed to include a timestamp (without stopping the logging).
 
-The log file is located in `$HOME/.megaCmd` for Linux and macOS, and `%LOCALAPPDATA%\MEGAcmd\.megaCmd` for Windows.
+The log file is located in `$XDG_STATE_HOME/megacmd` for Linux and macOS (default: `$HOME/.local/state/megacmd`), and `%LOCALAPPDATA%\MEGAcmd\.megaCmd` for Windows. Existing Linux/macOS installations may continue using `$HOME/.megaCmd` when the XDG state directory is empty; MEGAcmd reports when this legacy fallback is active.
 
 ## Verbosity on startup
 
